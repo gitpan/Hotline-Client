@@ -1,0 +1,18 @@
+=head1 NAME
+
+Hotline - Perl libraries for the Hotline internet client
+
+=head1 SYNOPSIS
+
+    use Hotline;
+
+=head1 DESCRIPTION
+
+The Hotline module provides a simple mechanism to load all of the
+Hotline::XXXX modules at once.  Currently this includes only:
+
+    Hotline::Client
+
+For more information on the Hotline::Client module, please see its
+documentation.  For more information on Hotline, see
+http://www.hotlinesw.com/

@@ -1,0 +1,35 @@
+DESCRIPTION
+
+Hotline::Client is a class implementing a limited Hotline internet client
+in Perl.  It was specifically developed to aid in the creation of Hotline
+"bots."  Hotline is an internet client/server system that's a sort of cross
+between IRC and a BBS.  See http://www.hotlinesw.com/ for more information.
+
+INSTALLATION
+
+The standard incantations should work:
+
+	perl Makefile.PL
+	make
+	make install
+
+Here are a few common variations on that theme:
+
+* If you don't want to or can't install in the system-wide directories,
+  you can use PREFIX to install elsewhere.  Example:
+
+	perl Makefile.PL PREFIX=~
+	make
+	make install
+
+  You'll probably have to create some dummy directories before this works.
+  Just look at the error messages and create the directories it says it
+  can't find.
+
+* If you're installing on a Mac OS system, the simplest way to get going
+  is to drag the entire contents of the "lib" folder into the "lib" folder
+  in your MacPerl folder.
+
+BUGS, TROUBLESHOOTING, ETC.
+
+Send problems and/or praise to John Siracusa (siracusa@mindspring.com)

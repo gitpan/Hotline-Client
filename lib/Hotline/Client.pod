@@ -1,0 +1,634 @@
+=head1 NAME
+
+Hotline::Client - Perl library for the Hotline internet client
+
+=head1 SYNOPSIS
+
+    use Hotline::Client;
+
+    $hlc = new Hotline::Client;
+    $hlc->connect("127.0.0.1")
+
+    $hlc->chat_handler(\&Chat_Handler);
+    $hlc->msg_handler(\&Msg_Handler);
+
+    $hlc->login(Login    => "Steve",
+                Password => "xyzzy",
+                Nickname => "Jobs",
+                Icon     => 128);
+
+    $hlc->run();
+    ...
+
+=head1 DESCRIPTION
+
+Hotline::Client is a class implementing a limited Hotline internet client
+in Perl.  It was specifically developed to aid in the creation of Hotline
+"bots." Hotline is an internet client/server system that's a sort of cross
+between IRC and a BBS.  See http://www.hotlinesw.com/ for more information.
+
+This document assumes you have some knowledge of the Hotline client.
+If not, I suggest downloading it from the URL above.  (It's shareware.
+Mac and PC versions are available)
+
+=head1 CAVEATS
+
+The Hotline protocol is not public. (An RFC?  I wish!)  This module was
+developed with the aid of the source code of the Unix "hx" hotline client
+written by Ryan Nielsen, the beginnings of a Java Hotline bot written by
+Gary Wong, and many hours spent staring at hexdumps of network data.  Only
+a limited set of the complete Hotline client functionality is implemented.
+Most notably absent are file transfer and private chat capablities.
+Finally, I'm sure all hell will break loose with the next major revision of
+Hotline.  Such is life.
+
+=head1 METHODS
+
+=head2 CONNECTING
+
+=over 4
+
+=item connect ADDRESS
+
+Opens a network connection to ADDRESS where ADDRESS is an IP address or
+hostname optionally followed by a space or a colon and a port number. If no
+port is given, it defaults to 5500 (Hotline standard port)
+
+Examples:
+
+    $hlc->connect("127.0.0.1:1234");
+    $hlc->connect("hostname.com 5678");
+
+Returns 1 if successful, undef otherwise.
+
+=item disconnect
+
+Closes the network connection.  Returns 1 if a connection was closed, undef
+if the connection wasn't open to begin with.
+
+=item login PARAMETERS
+
+Logs into a Hotline server opened via connect(), and requests the news and
+the userlist.  Arguments are in a "named parameter" format, and are
+case-sensitive.  The parameters are:
+
+    Nickname  Your nickname (default: guest)
+    Login     Your account name (deafult: guest)
+    Password  Your account password (default: <none>)
+    Icon      Your icon number (default: 410, the big red "H")
+
+Example of use:
+
+    $hlc->login(Login    => "Steve",
+                Password => "xyzzy",
+                Nickname => "Jobs",
+                Icon     => 128);
+
+If omitted, all parameters except Password will default to some sane (if
+not necessarily "sensible") value.  The task number is returned if the
+login request was successfully sent, undef otherwise.
+
+=item run
+
+Starts the event loop.  This must be called before any handlers will
+become active.  It returns when the connection has to the server has been
+closed.
+
+=back
+
+=head2 RUNNING
+
+=over 4
+
+=item blocking EXPR
+
+If EXPR evaluates to true, the run() method will use blocking i/o (this
+is the default).  Otherwise, i/o will be non-blocking.  With blocking
+i/o, the event loop will cycle each time data of any kind comes from the
+server.  This means that your hotline client may spend a lot of its time
+blocked (and therefore unable to do anything interesting) waiting for
+something to happen on the server.  Using non-blocking i/o will cycle
+through the event loop more frequently (see event_timing() below)
+regardless of server activity.
+
+=item event_timing SECS
+
+Sets the event loop timing to SECS seconds.  Fractional seconds are
+allowed. The default setting is 1 second.  This option only has an
+effect when non-blocking i/o is being used (see blocking() above).  If
+SECS is omitted, it returns the current event timing setting.
+
+=back
+
+=head2 COMMANDS
+
+Most of the methods in this section are treated as "tasks" by Hotline. 
+Their status (start time, finish time, error state, etc.) is tracked
+internally by task number.  They return a task number if the request was
+sent successfully, undef otherwise.
+
+chat() is a special case in that it is not treated as a "task" by Hotline.
+(It returns 1 on success instead of a task number)  The actual completion
+of a chat command can only be determined by examining the resulting data
+from the server.  For example, if you chat("hello"), you can look for that
+line of chat in your chat handler.  This is rarely necessary since the
+failure of a chat() command usually means that you have much bigger
+problems.
+
+=over 4
+
+=item chat LIST
+
+Sends the text formed by the concatenation of LIST to the server as "chat."
+Perl newlines ("\n") are translated to Hotline::Constants::HTLC_NEWLINE,
+which is Hotline's native newline character.
+
+=item comment PATH, TEXT
+
+Sets the comments for the file or folder located at PATH to TEXT. If TEXT
+is undef or an empty string, the comments for the file or folder will be
+removed.
+
+=item delete_file PATH
+
+Deletes the file or folder located at located at PATH.
+
+=item icon ICON
+
+Sets your icon in the userlist to ICON, where ICON is an integer.
+
+=item kick USER
+
+=item kick SOCKET
+
+Disconnects user specified by a reference to a Hotline::User object
+or a user socket number.
+
+=item move SRC, DEST
+
+Moves the file or folder located at the path SRC to the directory located
+at the path DEST.  SRC should be the full path to the file or folder you
+want to move, and DEST should be the full path to the B<directory> you want
+to move SRC too.  The file or folder name should only appear in the SRC
+path, never in the DEST path.  As a consequence, renaming files or folders
+must be done through rename() and cannot be rolled into a move() call. 
+Here's an example of a valid call to move():
+
+    $hlc->move("Folder1:file1", "Folder2:");
+
+This moves the "file1" from "Folder1" to "Folder2"
+
+=item msg USER, LIST
+
+=item msg SOCKET, LIST
+
+Sends the text formed by the concatenation of LIST as a private message to
+the user specified by a reference to a Hotline::User object or a user
+socket number.
+
+=item new_folder PATH
+
+Create a new folder located at PATH.
+
+=item nick TEXT
+
+Sets your nickname in the userlist to TEXT.
+
+=item post_news LIST
+
+Sends the text formed by the concatenation of LIST to the server as a
+news post.
+
+=item rename PATH, NAME
+
+Renames the file or folder located at PATH to NAME.  Note that PATH
+is the full path to the target, but NAME is just the new name without
+any path specification.  Example:
+
+    $hlc->rename("Pets:cat", "dog");
+
+This changes the name of the file "cat" in the folder "Pets" to "dog"
+
+=back
+
+=head2 REQUESTS
+
+All the methods in this section are treated as "tasks" by Hotline. Their
+status (start time, finish time, error state, etc.) is tracked internally
+by task number.  All these methods return a task number if the request was
+sent successfully, undef otherwise.
+
+When a tasks completes, the data is stored in the appropriate
+Hotline::Client attribute.  For example, when a req_news() task completes,
+the data is available via the news() method.
+
+=over 4
+
+=item req_filelist PATH
+
+Requests the file listing for the folder specified by PATH, or the root
+directory if PATH is omitted.
+
+=item req_fileinfo PATH
+
+Requests the file information for the file or folder specified by PATH.
+
+=item req_news
+
+Requests the news from the server.
+
+=item req_userinfo SOCKET
+
+Requests user information for the user specified by SOCKET.
+
+=item req_userlist
+
+Request the list of users currently logged on.
+
+=back
+
+=head2 ATTRIBUTES
+
+The methods in this section return data or references to data structures
+in the Hotline::Client object.  Some data structures contain references to
+objects.  For details on those objects, see their respective documentation
+(i.e. perldoc Hotline::User)
+
+=over 4
+
+=item agreement
+
+Returns a reference to the server's user agreement text, or undef if there
+is none.
+
+=item files
+
+Returns a reference to a hash of arrays containing Hotline::FileListItem
+objects, keyed by directory path.  Here's some sample code that prints the
+entire file tree:
+
+    $files = $hlc->files();              # Get reference to the file tree
+
+    foreach $directory (keys(%{$files}))
+    {
+      print "$directory\n";              # Ex: "Uploads:Pictures"
+
+      foreach $file (@{$files->{$directory}})
+      {
+        print "\t", $file->name(), "\n"; # Ex: "Picture.jpg"
+      }
+    }
+
+=item last_activity
+
+Returns the time the last packet was received from the server in the
+system's native time() format. (Usually seconds since the Unix epoch.
+MacPerl is probably the only odd-ball)
+
+=item news
+
+Returns a reference to an array of news posts, or undef if the news has not
+yet been requested or is empty.
+
+=item path_separator CHARACTER
+
+Sets the path separator to CHARACTER if an argument is given (the default
+setting is the Mac OS path separator ":").  Returns the current value of
+the path separator in both cases.
+
+=item server
+
+Returns the address of the server currently connected to as a hostname or
+IP address , depending on what the actual argument to connect() was.  If
+the port connected to is anything other than the "standard" Hotline port
+(5500), then a colon and the port number are tacked onto the end of the
+server name.  If not connected at all, undef is returned.
+
+=item userlist
+
+Returns a reference to a hash of Hotline::User objects keyed by socket
+number, or undef if the userlist has not yet been requested.
+
+=item user_by_nick REGEX
+
+Returns reference(s) to user objects with nicknames matching REGEX, or
+undef if there are no matches.  You will get undef if you try to call this
+method before you have successfully retreived the userlist from the server.  
+REGEX is treated as a case-sensitive anchored regular expression internally
+(i.e. /^REGEX$/).  If your regex matches more than one user's nickname, and
+user_by_nick() was called in array context, an array of references to user
+objects will be returned.  Otherwise, a reference to the first user object
+that matched will be returned (as ordered by socket number, from low to
+high).
+
+=item user_by_socket SOCKET
+
+Returns a reference to the user object whose socket number is equal to
+SOCKET, or undef if there is no user at that socket.
+
+=back
+
+=head2 HANDLERS
+
+The methods in this section deal with getting and setting the handler
+routines for each kind of event.  If you do not set your own handler for an
+event, the default handler (usually just a print to STDOUT) will be used.  
+You can enable and disable the default handlers with the default_handlers()
+method.  They are enabled by default.
+
+=over 4
+
+=item default_handlers EXPR
+
+If EXPR is omitted, it returns the default handler setting.  Otherwise, it 
+sets the default handler setting to EXPR (anything that evaluates to true 
+is considered "on").  Default handlers are on by default.
+
+=item handlers
+
+Returns a reference to a hash, keyed by event type strings (the strings in
+CAPS below).  The values associated with the keys are either code
+references or undef.  Event types are as follows:
+
+    Events:
+
+    AGREEMENT    User agreement text received.
+    CHAT         New chat appeared.
+    CHAT_ACTION  A new chat "action" appeared.
+    COLOR        A user changed color in the userlist.
+    EVENT        Next cycle in the event loop.
+    ICON         A user changed icon in the userlist.
+    JOIN         A user joined the server.
+    LEAVE        A user left the server.
+    MSG          A private message arrived.
+    NEWS         A news post was made.
+    NICK         A user changed nickname in the userlist.
+    QUIT         The server was shutdown.
+    SERVER_MSG   A server message arrived.
+
+    Tasks:
+
+    DELETE_FILE  A file or folder was deleted.
+    FILEINFO     File information received.
+    FILELIST     File list received.
+    KICK         Disconnect user task completed.
+    LOGIN        Login task completed.
+    MOVE_FILE    A file or folder was moved.
+    NEW_FOLDER   A new folder was created.
+    POST_NEWS    A news post was made.
+    SEND_MSG     A private message was sent.
+    SERVER_MSG   A server message was received.
+    SET_INFO     File information was set.
+    TASKERROR    A task error ocurred.
+    USERINFO     User information received.
+    USERLIST     User list received.
+
+=back
+
+=head2 SET/GET HANDLERS
+
+The methods in this section expect either one code reference argument, or no
+arguments at all.  With one argument, the handler is set to the given code
+reference.  The return value is always the current value of the handler
+(should be either undef or a code reference).
+
+The code reference should point to a subroutine that expects at least one
+argument: a reference to the Hotline::Client object itself (listed as
+"SELF" below).  Other arguments vary according to the event being handled. 
+In this section, only the varying arguments to the handler subroutine are
+described.
+
+Also note that you don't have to do the "obvious" tasks associated with
+each handler.  For example, in the "leave" handler, you don't have to
+remove the user from the userlist.  That will be done for you by the
+Hotline::Client object.
+
+=over 4
+
+=head2 Events
+
+=item agreement_handler CODE (SELF, TEXT)
+
+User agreement text received.
+
+    TEXT        Reference to the agreement text.
+
+=item chat_handler CODE (SELF, TEXT)
+
+New chat appeared.
+
+    TEXT        Reference to the chat text.
+
+=item chat_action_handler CODE (SELF, TEXT)
+
+A new chat "action" appeared.
+
+    TEXT        Reference to the chat text.
+
+=item color_handler CODE (SELF, USER, OLD_COLOR, NEW_COLOR)
+
+A user changed color in the userlist.
+
+    USER        Reference to a Hotline::User object.
+    OLD_COLOR   The user's previous color.
+    NEW_COLOR   The user's new color.
+    
+Valid colors:
+    
+    1    Black  Active normal user.  
+    2    Red    Active admin user.
+    3    Gray   Inactive normal user.
+    4    Pink   Inactive admin user.
+
+=item event_loop_handler CODE (SELF, IDLE)
+
+Next cycle in the event loop.  Idle events only occur when non-blocking i/o
+is active.
+
+    IDLE        True if the the event is an idle event.
+
+=item icon_handler CODE (SELF, USER, OLD_ICON, NEW_ICON)
+
+A user changed icon in the userlist.
+
+    USER        Reference to a Hotline::User object.
+    OLD_ICON    The user's previous icon number.
+    NEW_ICON    The user's new icon number.
+
+=item join_handler CODE (SELF, USER)
+
+A user joined the server.
+
+    USER        Reference to a Hotline::User object.
+
+=item leave_handler CODE (SELF, USER)
+
+A user left the server.
+
+    USER        Reference to a Hotline::User object.
+
+=item msg_handler CODE (SELF, USER, TEXT, NICK)
+
+A private message arrived.
+
+    USER        Reference to the sender's Hotline::User object.
+    TEXT        Reference to the message text.
+    NICK        Sender's nickname.
+
+=item news_handler CODE (SELF, TEXT)
+
+A news post was made.
+
+    TEXT        Reference to the news post text.
+
+=item nick_handler CODE (SELF, USER, OLD_NICK, NEW_NICK)
+
+A user changed nickname in the userlist.
+
+    USER        Reference to a Hotline::User object.
+    OLD_NICK    The user's previous nickname.
+    NEW_NICK    The user's new nickname.
+
+=item quit_handler CODE (SELF, TEXT)
+
+The server was shutdown.
+
+    TEXT        Reference to shutdown message text, if any.
+
+=item server_msg_handler CODE (SELF, TEXT)
+
+A server message was received.
+
+    TEXT        Reference to the message text.
+
+=head2 Tasks
+
+=item delete_file_handler CODE (SELF, TASK)
+
+A file or folder was deleted.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item file_info_handler CODE (SELF, TASK, INFO)
+
+File information received.
+
+    TASK        Reference to a Hotline::Task object.
+    INFO        Reference to a Hotline::FileInfoItem object.
+
+=item file_list_handler CODE (SELF, TASK)
+
+File list received.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item kick_handler CODE (SELF, TASK)
+
+Disconnect user task completed.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item login_handler CODE (SELF, TASK)
+
+Login task completed.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item move_file CODE (SELF, TASK)
+
+A file or folder was moved.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item new_folder CODE (SELF, TASK)
+
+A new folder was created.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item post_news_handler CODE (SELF, TASK)
+
+A news post was made.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item send_msg_handler CODE (SELF, TASK)
+
+A private message was sent.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item set_info_handler CODE (SELF, TASK)
+
+File information was set (this includes both renaming and setting file
+comments).
+
+    TASK        Reference to a Hotline::Task object.
+
+=item task_error_handler CODE (SELF, TASK)
+
+A task error ocurred.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item user_info_handler CODE (SELF, TASK)
+
+User information received.
+
+    TASK        Reference to a Hotline::Task object.
+
+=item user_list_handler CODE (SELF, TASK)
+
+User list task has completed successfully.
+
+    TASK        Reference to a Hotline::Task object.
+
+=back
+
+=head2 MISCELLANEOUS
+
+=over 4
+
+=item debug EXPR
+
+If EXPR is omitted, returns the debugging status (off by default),
+otherwise sets debugging status to EXPR (true means debugging is on).
+
+=item version
+
+Returns the Hotline::Client version string.
+
+=back
+
+=head1 TO DO
+
+=over 4
+
+=item *
+
+Implement user administration features.
+
+=item *
+
+Implement private chat features.
+
+=item *
+
+Implement file transfer features.
+
+=back
+
+=head1 BUGS
+
+Detection of server crashes, shutdowns, or other abrupt network
+terminations are not handled correctly 100% of the time.
+
+=head1 AUTHOR
+
+John Siracusa (siracusa@mindspring.com)
+
+=head1 COPYRIGHT
+
+Copyright(c) 1998 by John C. Siracusa.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same terms
+as Perl itself.

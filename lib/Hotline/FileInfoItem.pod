@@ -1,0 +1,90 @@
+=head1 NAME
+
+Hotline::FileInfoItem - File object used internally by Hotline::Client
+
+=head1 SYNOPSIS
+
+    use Hotline::FileInfoItem;
+
+    $file = new Hotline::FileInfoItem;
+
+    $file->name("smile");
+    $file->comments("A happy file.");
+    ...
+
+=head1 DESCRIPTION
+
+Hotline::FileInfoItem is a simple class for storing and retrieving file
+information,  You should never have to create your own
+Hotline::FileInfoItem objects when using Hotline::Client.  Getting and (to
+a lesser extent) setting attributes is all that should be necessary.
+
+=head1 CONSTRUCTION
+
+=over 4
+
+=item new
+
+Creates a new Hotline::FileInfoItem object with all attributes set to undef.
+
+=back
+
+=head1 METHODS
+
+All the Hotline::FileInfoItem methods are simple attribute get/set routines.
+If given an argument, they set an attribute.  In all cases, they
+return the current value of the attribute.
+
+=over 4
+
+=item comment TEXT
+
+The file comments (as seen in the Mac OS Finder).
+
+=item ctime NUM
+
+The creation time of the file, given as a Mac OS native time value.  Add
+the constant Hotline::Constants::HTLC_MACOS_TO_UNIX_TIME to it to change it
+to seconds since the Unix epoch.
+
+=item creator TEXT
+
+The file creator, given as a four-letter Mac OS creator code ("TTXT", "SIT!",
+etc.)
+
+=item name TEXT
+
+The file name.
+
+=item icon
+
+The file icon given as a four-letter code.
+
+=item mtime NUM
+
+=item ctime NUM
+
+The modification time of the file, given as a Mac OS native time value. 
+Add the constant Hotline::Constants::HTLC_MACOS_TO_UNIX_TIME to it to
+change it to seconds since the Unix epoch.
+
+=item size NUM
+
+The size of the file in bytes.
+
+=item type TEXT
+
+The file type, given as a four-letter Mac OS type code ("TEXT", "PICT", etc.)
+or Hotline::Constants::HTLC_FOLDER_TYPE for folders.
+
+=back
+
+=head1 AUTHOR
+
+John Siracusa (siracusa@mindspring.com)
+
+=head1 COPYRIGHT
+
+Copyright(c) 1998 by John Siracusa.  All rights reserved.  This program is
+free software; you can redistribute it and/or modify it under the same terms
+as Perl itself.
